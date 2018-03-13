@@ -103,7 +103,7 @@ class PhysicsSim():
             perpendicular_speed = speeds[num] + body_velocity
             self.prop_wind_speed[num] = perpendicular_speed[2]
 
-    def get_propeler_thrust(self, rotor_speeds):
+    def get_propeller_thrust(self, rotor_speeds):
         '''calculates net thrust (thrust - drag) based on velocity
         of propeller and incoming power'''
         thrusts = []
@@ -119,7 +119,7 @@ class PhysicsSim():
 
     def next_timestep(self, rotor_speeds):
         self.calc_prop_wind_speed()
-        thrusts = self.get_propeler_thrust(rotor_speeds)
+        thrusts = self.get_propeller_thrust(rotor_speeds)
         self.linear_accel = self.get_linear_forces(thrusts) / self.mass
 
         position = self.pose[:3] + self.v * self.dt + 0.5 * self.linear_accel * self.dt**2
