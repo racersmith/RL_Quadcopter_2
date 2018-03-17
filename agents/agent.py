@@ -1,5 +1,5 @@
 import numpy as np
-from task import Task
+from tasks.task import Task
 import random
 from collections import namedtuple, deque
 import tensorflow as tf
@@ -9,15 +9,22 @@ import tensorflow as tf
 
 from tensorflow.contrib.keras import layers, models, optimizers
 from tensorflow.contrib.keras import backend as K
+from tensorflow.contrib.keras import regularizers
 
 class DDPG():
     """Reinforcement Learning agent that learns using DDPG."""
-    def __init__(self, task):
+    def __init__(self, task, gym=False):
         self.task = task
-        self.state_size = task.state_size
-        self.action_size = task.action_size
-        self.action_low = task.action_low
-        self.action_high = task.action_high
+        if gym:
+            self.state_size = np.prod(task.observation_space.shape)
+            self.action_size = np.prod(task.action_space.shape)
+            self.action_low = task.action_space.low
+            self.action_high = task.action_space.high
+        else:
+            self.state_size = task.state_size
+            self.action_size = task.action_size
+            self.action_low = task.action_low
+            self.action_high = task.action_high
 
         # Actor (Policy) Model
         self.actor_local = Actor(self.state_size, self.action_size, self.action_low, self.action_high)
@@ -32,14 +39,14 @@ class DDPG():
         self.actor_target.model.set_weights(self.actor_local.model.get_weights())
 
         # Noise process
-        self.exploration_mu = 0
+        self.exploration_mu = 0.0
         self.exploration_theta = 0.15
         self.exploration_sigma = 0.2
         self.noise = OUNoise(self.action_size, self.exploration_mu, self.exploration_theta, self.exploration_sigma)
 
         # Replay memory
-        self.buffer_size = 100000
-        self.batch_size = 512
+        self.buffer_size = 250000
+        self.batch_size = 64
         self.memory = ReplayBuffer(self.buffer_size, self.batch_size)
 
         # Algorithm parameters
@@ -71,11 +78,15 @@ class DDPG():
         # Add in step reward to episode score
         self.score += reward
 
-    def act(self, states):
+    def act(self, states, explore=True):
         """Returns actions for given state(s) as per current policy."""
         state = np.reshape(states, [-1, self.state_size])
         action = self.actor_local.model.predict(state)[0]
-        return list(action + self.noise.sample())  # add some noise for exploration
+        if explore:
+            # add some noise for exploration
+            noise = self.noise.sample()*(self.action_high - self.action_low)
+            action = np.clip(action + noise, self.action_low, self.action_high)
+        return action
 
     def learn(self, experiences):
         """Update policy and value parameters using given batch of experience tuples."""
@@ -144,18 +155,24 @@ class Actor:
 
         # Add hidden layers
 
-        net = layers.Dense(units=256, activation='relu')(states)
+        net = layers.Dense(units=128, activation='relu',
+                           kernel_regularizer=regularizers.l2(0.001))(states)
         net = layers.BatchNormalization()(net)
-        net = layers.Dense(units=512, activation='relu')(net)
+
+        net = layers.Dense(units=256, activation='relu',
+                           kernel_regularizer=regularizers.l2(0.001))(net)
         net = layers.BatchNormalization()(net)
-        net = layers.Dense(units=256, activation='relu')(net)
+
+        net = layers.Dense(units=512, activation='relu',
+                           kernel_regularizer=regularizers.l2(0.001))(net)
         net = layers.BatchNormalization()(net)
+
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
 
         # Add final output layer with sigmoid activation
-        raw_actions = layers.Dense(units=self.action_size, activation='sigmoid',
-            name='raw_actions')(net)
+        raw_actions = layers.Dense(units=self.action_size, activation='sigmoid', name='raw_actions',
+                                   kernel_regularizer=regularizers.l2(0.001))(net)
 
         # Scale [0, 1] output for each action dimension to proper range
         actions = layers.Lambda(lambda x: (x * self.action_range) + self.action_low,
@@ -171,7 +188,7 @@ class Actor:
         # Incorporate any additional losses here (e.g. from regularizers)
 
         # Define optimizer and training function
-        optimizer = optimizers.Adam()
+        optimizer = optimizers.Adam(lr=0.001)
         updates_op = optimizer.get_updates(params=self.model.trainable_weights, loss=loss)
         self.train_fn = K.function(
             inputs=[self.model.input, action_gradients, K.learning_phase()],
@@ -204,19 +221,25 @@ class Critic:
         actions = layers.Input(shape=(self.action_size,), name='actions')
 
         # Add hidden layer(s) for state pathway
-        net_states = layers.Dense(units=256, activation='relu')(states)
+        net_states = layers.Dense(units=128, activation='relu',
+                                  kernel_regularizer=regularizers.l2(0.001))(states)
         net_states = layers.BatchNormalization()(net_states)
-        net_states = layers.Dense(units=512, activation='relu')(net_states)
+        net_states = layers.Dense(units=256, activation='relu',
+                                  kernel_regularizer=regularizers.l2(0.001))(net_states)
         net_states = layers.BatchNormalization()(net_states)
-        net_states = layers.Dense(units=256, activation='relu')(net_states)
+        net_states = layers.Dense(units=512, activation='relu',
+                                  kernel_regularizer=regularizers.l2(0.001))(net_states)
         net_states = layers.BatchNormalization()(net_states)
 
         # Add hidden layer(s) for action pathway
-        net_actions = layers.Dense(units=256, activation='relu')(actions)
+        net_actions = layers.Dense(units=128, activation='relu',
+                                   kernel_regularizer=regularizers.l2(0.001))(actions)
         net_actions = layers.BatchNormalization()(net_actions)
-        net_actions = layers.Dense(units=512, activation='relu')(net_actions)
+        net_actions = layers.Dense(units=256, activation='relu',
+                                   kernel_regularizer=regularizers.l2(0.001))(net_actions)
         net_actions = layers.BatchNormalization()(net_actions)
-        net_actions = layers.Dense(units=256, activation='relu')(net_actions)
+        net_actions = layers.Dense(units=512, activation='relu',
+                                   kernel_regularizer=regularizers.l2(0.001))(net_actions)
         net_actions = layers.BatchNormalization()(net_actions)
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
@@ -225,16 +248,23 @@ class Critic:
         net = layers.Add()([net_states, net_actions])
         net = layers.Activation('relu')(net)
 
-        # Add more layers to the combined network if needed
+        net = layers.Dense(units=128, activation='relu',
+                           kernel_regularizer=regularizers.l2(0.001))(net)
+        net = layers.BatchNormalization()(net)
+
+        net = layers.Dense(units=32, activation='relu',
+                           kernel_regularizer=regularizers.l2(0.001))(net)
+        net = layers.BatchNormalization()(net)
 
         # Add final output layer to prduce action values (Q values)
-        Q_values = layers.Dense(units=1, name='q_values')(net)
+        Q_values = layers.Dense(units=1, name='q_values', activation=None,
+                                kernel_regularizer=regularizers.l2(0.001))(net)
 
         # Create Keras model
         self.model = models.Model(inputs=[states, actions], outputs=Q_values)
 
         # Define optimizer and compile model for training with built-in loss function
-        optimizer = optimizers.Adam()
+        optimizer = optimizers.Adam(lr=0.001)
         self.model.compile(optimizer=optimizer, loss='mse')
 
         # Compute action gradients (derivative of Q values w.r.t. to actions)
