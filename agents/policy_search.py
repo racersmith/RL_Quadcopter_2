@@ -11,9 +11,9 @@ class PolicySearch_Agent():
         self.action_high = task.action_high
         self.action_range = self.action_high - self.action_low
 
-        self.w = np.random.normal(
+        self.w = np.random.normal(0.0,
             size=(self.state_size, self.action_size),  # weights for simple linear policy: state_space x action_space
-            scale=(self.action_range / (2 * self.state_size))) # start producing actions in a decent range
+            scale=np.sqrt(self.state_size*self.action_size)) # start producing actions in a decent range
 
         # Score tracker and learning parameters
         self.best_w = None
@@ -38,9 +38,14 @@ class PolicySearch_Agent():
         if done:
             self.learn()
 
+
+    def sigmoid(self, x):
+        return 1/(1+np.exp(-x))
+
     def act(self, state):
         # Choose action based on given state and policy
         action = np.dot(state, self.w)  # simple linear policy
+        action = self.sigmoid(action) * self.action_range + self.action_low
         return action
 
     def learn(self):

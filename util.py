@@ -24,7 +24,7 @@ def log_run(agent, file_name):
             to_write += list(agent.task.sim.pose)
             to_write += list(agent.task.sim.v)
             to_write += list(agent.task.sim.angular_v)
-            to_write += list(rotor_speeds)
+            to_write += list(agent.task.sim.rotor_speeds)
             to_write += [reward]
 
             for ii in range(len(labels)):
@@ -43,6 +43,14 @@ def load_log(file_path):
 def plot_log(file_path):
     results = load_log(file_path)
     plot_run(results)
+
+def normalize_angle(angles):
+    # Adjust angles to range -pi to pi
+    norm_angles = np.copy(angles)
+    for i in range(len(norm_angles)):
+        while norm_angles[i] > np.pi:
+            norm_angles[i] -= 2 * np.pi
+    return norm_angles
 
 
 def plot_run(results):
@@ -68,9 +76,9 @@ def plot_run(results):
 
     plt.subplot(3, 3, 3)
     plt.title('Orientation')
-    plt.plot(results['time'], results['phi'], label='phi')
-    plt.plot(results['time'], results['theta'], label='theta')
-    plt.plot(results['time'], results['psi'], label='psi')
+    plt.plot(results['time'], normalize_angle(results['phi']), label='phi')
+    plt.plot(results['time'], normalize_angle(results['theta']), label='theta')
+    plt.plot(results['time'], normalize_angle(results['psi']), label='psi')
     plt.xlabel('time, seconds')
     plt.legend()
 
