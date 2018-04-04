@@ -107,3 +107,13 @@ def plot_run(results):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+# def get_episodes_from_memory(memory):
+#     episodes = []
+#
+#     while
+#
+# def play_memory(memory):
+#     while
+#     episode
