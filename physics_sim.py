@@ -24,10 +24,11 @@ def body_to_earth_frame(ii, jj, kk):
 
 
 class PhysicsSim():
-    def __init__(self, init_pose=None, init_velocities=None, init_angle_velocities=None, runtime=5.):
-        self.init_pose = init_pose
-        self.init_velocities = init_velocities
-        self.init_angle_velocities = init_angle_velocities
+    def __init__(self, init_pose=None, init_velocities=None, init_angle_vel=None, runtime=5.):
+
+        self.init_pose = np.array([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]) if init_pose is None else init_pose
+        self.init_velocities = np.array([0.0, 0.0, 0.0]) if init_velocities is None else init_velocities
+        self.init_angle_velocities = np.array([0.0, 0.0, 0.0]) if init_angle_vel is None else init_angle_vel
         self.runtime = runtime
 
         self.gravity = -9.81  # m/s
@@ -50,17 +51,21 @@ class PhysicsSim():
         self.lower_bounds = np.array([-env_bounds / 2, -env_bounds / 2, 0])
         self.upper_bounds = np.array([env_bounds / 2, env_bounds / 2, env_bounds])
 
+        self.init_rotor_speeds = np.mean([self.upper_bounds, self.lower_bounds], axis=1)
+
+        # Set initial state variables
         self.reset()
 
     def reset(self):
         self.time = 0.0
-        self.rotor_speeds = np.zeros(4)
-        self.pose = np.array([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]) if self.init_pose is None else self.init_pose
-        self.v = np.array([0.0, 0.0, 0.0]) if self.init_velocities is None else self.init_velocities
-        self.angular_v = np.array([0.0, 0.0, 0.0]) if self.init_angle_velocities is None else self.init_angle_velocities
-        self.linear_accel = np.array([0.0, 0.0, 0.0])
-        self.angular_accels = np.array([0.0, 0.0, 0.0])
-        self.prop_wind_speed = np.array([0., 0., 0., 0.])
+        self.rotor_speeds = np.copy(self.init_rotor_speeds)  # to avoid the div0 error in get_thrust
+        self.pose = np.copy(self.init_pose)
+        self.v = np.copy(self.init_velocities)
+        self.angular_v = np.copy(self.init_angle_velocities)
+        self.linear_accel = np.zeros(3)
+        self.angular_accels = np.zeros(3)
+        self.prop_wind_speed = np.zeros(4)
+        self.calc_prop_wind_speed()
         self.done = False
 
     def find_body_velocity(self):
@@ -142,9 +147,13 @@ class PhysicsSim():
             V = self.prop_wind_speed[prop_number]
             D = self.propeller_size
             n = rotor_speeds[prop_number]
-            J = V / n * D
+            if abs(n) > 1:
+                J = V / n * D
+            else:
+                J = 0.0
             # From http://m-selig.ae.illinois.edu/pubs/BrandtSelig-2011-AIAA-2011-1255-LRN-Propellers.pdf
-            C_T = max(0.12 - 0.07*max(0.0, J)-.1*max(0.0, J)**2, 0.0)
+            # C_T = max(0.12 - 0.07*max(0.0, J)-.1*max(0.0, J)**2, 0.0)
+            C_T = 0.12 - 0.07 * J - 0.1 * J** 2
             thrusts.append(C_T * self.rho * n**2 * D**4)
         return thrusts
 
