@@ -47,7 +47,7 @@ class DDPG():
         # self.noise = OUNoise(self.action_size, self.exploration_mu, self.exploration_theta, self.exploration_sigma)
 
         # Replay memory
-        self.buffer_size = 10000
+        self.buffer_size = 100000
         self.batch_size = 256
         self.memory = ReplayBuffer(self.buffer_size, self.batch_size)
 
@@ -104,16 +104,22 @@ class DDPG():
     def learn(self, experiences):
         """Update policy and value parameters using given batch of experience tuples."""
         # Convert experience tuples to separate arrays for each element (states, actions, rewards, etc.)
-        states = np.vstack([e.state for e in experiences if e is not None])
-        actions = np.array([e.action for e in experiences if e is not None]).astype(np.float32).reshape(-1, self.action_size)
-        rewards = np.array([e.reward for e in experiences if e is not None]).astype(np.float32).reshape(-1, 1)
-        dones = np.array([e.done for e in experiences if e is not None]).astype(np.uint8).reshape(-1, 1)
-        next_states = np.vstack([e.next_state for e in experiences if e is not None])
+        # states = np.vstack([e.state for e in experiences if e is not None])
+        # actions = np.array([e.action for e in experiences if e is not None]).astype(np.float32).reshape(-1, self.action_size)
+        # rewards = np.array([e.reward for e in experiences if e is not None]).astype(np.float32).reshape(-1, 1)
+        # dones = np.array([e.done for e in experiences if e is not None]).astype(np.uint8).reshape(-1, 1)
+        # next_states = np.vstack([e.next_state for e in experiences if e is not None])
+
+        # Unpack experiences
+        states, actions, rewards, next_states, dones = experiences
 
         # Get predicted next-state actions and Q values from target models
         #     Q_targets_next = critic_target(next_state, actor_target(next_state))
         actions_next = self.actor_target.model.predict_on_batch(next_states)
         Q_targets_next = self.critic_target.model.predict_on_batch([next_states, actions_next])
+
+        # Update priority experience
+        self.memory.update_Q(Q_targets_next)
 
         # Compute Q targets for current states and train critic model (local)
         Q_targets = rewards + self.gamma * Q_targets_next * (1 - dones)
@@ -220,7 +226,7 @@ class Actor:
                                    activation='sigmoid',
                                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                    kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
-                                   bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
+                                   # bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                    name='raw_actions')(net)
 
         # Scale [0, 1] output for each action dimension to proper range
@@ -237,7 +243,7 @@ class Actor:
         # Incorporate any additional losses here (e.g. from regularizers)
 
         # Define optimizer and training function
-        optimizer = optimizers.Adam(lr=1e-6)#, beta_1=0.5)
+        optimizer = optimizers.Adam(lr=1e-4, clipvalue=0.5)#, beta_1=0.5)
         # optimizer = optimizers.SGD(lr=1e-6)
         updates_op = optimizer.get_updates(params=self.model.trainable_weights, loss=loss)
         self.train_fn = K.function(
@@ -276,10 +282,6 @@ class Critic:
         size_repeat = 10
         block_size = size_repeat*self.state_size + size_repeat*self.action_size
         print("Critic block size = {}".format(block_size))
-        state_net_size = np.clip(int(block_size*self.state_size/(self.state_size+self.action_size)),
-                                 1,
-                                 block_size-1)
-        action_net_size = block_size - state_net_size
 
         # net_states = layers.Dense(state_net_size,
         #                           kernel_initializer=initializers.RandomNormal(mean=1.0, stddev=0.1),
@@ -405,14 +407,14 @@ class Critic:
                                 activation=None,
                                 # kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                 kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3),
-                                bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
+                                # bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                 name='q_values')(net)
 
         # Create Keras model
         self.model = models.Model(inputs=[states, actions], outputs=Q_values)
 
         # Define optimizer and compile model for training with built-in loss function
-        optimizer = optimizers.Adam(lr=1e-5)#, beta_1=0.5)
+        optimizer = optimizers.Adam(lr=1e-3, clipvalue=0.5)#, beta_1=0.5)
         # optimizer = optimizers.SGD(lr=1e-6)
         self.model.compile(optimizer=optimizer, loss='mse')
 
@@ -432,8 +434,8 @@ def res_block(inputs, size):
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(inputs)
-    # net = layers.BatchNormalization()(net)
-    # net = layers.Dropout(0.2)(net)
+    net = layers.BatchNormalization()(net)
+    net = layers.Dropout(0.2)(net)
     net = layers.LeakyReLU(0.1)(net)
 
     net = layers.Dense(size,
@@ -442,8 +444,8 @@ def res_block(inputs, size):
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(net)
-    # net = layers.BatchNormalization()(net)
-    # net = layers.Dropout(0.2)(net)
+    net = layers.BatchNormalization()(net)
+    net = layers.Dropout(0.2)(net)
     net = layers.add([inputs, net])
     net = layers.LeakyReLU(0.1)(net)
     return net
@@ -462,14 +464,44 @@ class ReplayBuffer:
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
 
+        self.batch_index = None
+        self.p = None
+
+        self.staged = []
+
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
-        e = self.experience(state, action, reward, next_state, done)
-        self.memory.append(e)
+        if np.all([state, action, reward, next_state, done] is not None):
+            e = self.experience(state, action, reward, next_state, done)
+            self.memory.append([e, 0.0])
 
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
-        return random.sample(self.memory, k=self.batch_size)
+        # return random.sample(self.memory, k=self.batch_size)
+
+        # Prioritized experience replay
+        self.update_p()
+        self.batch_index = np.random.choice(np.arange(len(self.memory)), self.batch_size, p=self.p, replace=False)
+
+        states = np.vstack([self.memory[i][0].state for i in self.batch_index])
+        actions = np.array([self.memory[i][0].action for i in self.batch_index]).astype(np.float32).reshape(self.batch_size, -1)
+        rewards = np.array([self.memory[i][0].reward for i in self.batch_index]).astype(np.float32).reshape(-1, 1)
+        next_states = np.vstack([self.memory[i][0].next_state for i in self.batch_index])
+        dones = np.array([self.memory[i][0].done for i in self.batch_index]).astype(np.uint8).reshape(-1, 1)
+
+        return states, actions, rewards, next_states, dones
+        # return self.memory[self.batch_index]
+
+    def update_Q(self, Q_targets_next):
+        self.staged.append([self.batch_index, Q_targets_next.ravel()])
+
+    def update_p(self):
+        for batch_index, Q_targets_next in self.staged:
+            for q_index, memory_index in enumerate(batch_index):
+                self.memory[memory_index][1] = Q_targets_next[q_index]
+
+        error = np.array([(q - e.reward[0]) ** 2 for e, q in self.memory])
+        self.p = error/np.sum(error)
 
     def __len__(self):
         """Return the current size of internal memory."""
