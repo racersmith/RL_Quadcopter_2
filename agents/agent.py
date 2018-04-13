@@ -118,11 +118,10 @@ class DDPG():
         actions_next = self.actor_target.model.predict_on_batch(next_states)
         Q_targets_next = self.critic_target.model.predict_on_batch([next_states, actions_next])
 
-        # Update priority experience
-        self.memory.update_Q(Q_targets_next)
-
         # Compute Q targets for current states and train critic model (local)
         Q_targets = rewards + self.gamma * Q_targets_next * (1 - dones)
+
+        # Train critic model (local)
         self.critic_local.model.train_on_batch(x=[states, actions], y=Q_targets)
 
         # Train actor model (local)
@@ -169,54 +168,63 @@ class Actor:
         self.build_model()
 
     def build_model(self):
-        kernel_l2_reg = 0
+        kernel_l2_reg = 1e-5
 
         """Build an actor (policy) network that maps states -> actions."""
         # Define input layer (states)
         states = layers.Input(shape=(self.state_size,), name='states')
 
-        size_repeat = 10
-        block_size = size_repeat*self.state_size
-        print("Actor block size = {}".format(block_size))
+        # size_repeat = 20
+        # block_size = size_repeat*self.state_size
+        # print("Actor block size = {}".format(block_size))
 
-        net = layers.concatenate([states]*size_repeat)
-        for _ in range(5):
-            net = res_block(net, block_size)
+        # net = layers.concatenate([states]*size_repeat)
+        # for _ in range(5):
+        #     net = res_block(net, block_size)
 
         # Add hidden layers
         # states = layers.BatchNormalization()(states)
-        # net = layers.Dense(units=512,
-        #                    activation='elu',
-        #                    # kernel_initializer='lecun_normal',
-        #                          # activity_regularizer=regularizers.l2(0.1),
-        #                          # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                          use_bias=True)(states)
+        net = layers.Dense(units=300,
+                           activation='relu',
+                           # activation=None,
+                           # kernel_initializer='lecun_normal',
+                           # activity_regularizer=regularizers.l2(0.1),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           use_bias=True)(states)
         # net = layers.BatchNormalization()(net)
         # net = layers.AlphaDropout(0.2)(net)
         # net = layers.LeakyReLU()(net)
         # net = layers.ELU()(net)
 
-        # net = layers.Dense(units=1024,
-        #                    activation='elu',
-        #                    # kernel_initializer='lecun_normal',
-        #                    # activity_regularizer=regularizers.l2(0.01),
-        #                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                    use_bias=True)(net)
+        net = layers.Dense(units=400,
+                           activation='relu',
+                           # activation=None,
+                           # kernel_initializer='lecun_normal',
+                           # activity_regularizer=regularizers.l2(0.01),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
         # net = layers.AlphaDropout(0.2)(net)
         # net = layers.LeakyReLU()(net)
         # net = layers.ELU()(net)
         #
-        # net = layers.Dense(units=256,
-        #                    activation='elu',
-        #                    # activity_regularizer=regularizers.l2(0.01),
-        #                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                    use_bias=True)(net)
+        net = layers.Dense(units=200,
+                           activation='relu',
+                           # activation=None,
+                           # activity_regularizer=regularizers.l2(0.01),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
         # net = layers.LeakyReLU()(net)
         # net = layers.ELU()(net)
 
-        # net = layers.Dense(units=100,
+        # net = layers.Dense(units=32,
+                           # activation='relu',
+                           # activation=None,
+                           # activity_regularizer=regularizers.l2(0.01),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+        #                    use_bias=True)(net)
+        # net = layers.BatchNormalization()(net)
         # net = layers.LeakyReLU()(net)
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
@@ -243,7 +251,10 @@ class Actor:
         # Incorporate any additional losses here (e.g. from regularizers)
 
         # Define optimizer and training function
-        optimizer = optimizers.Adam(lr=1e-4, clipvalue=0.5)#, beta_1=0.5)
+        optimizer = optimizers.Adam(lr=1e-4,
+                                    # clipvalue=0.5,
+                                    # clipnorm=1.0
+                                    )
         # optimizer = optimizers.SGD(lr=1e-6)
         updates_op = optimizer.get_updates(params=self.model.trainable_weights, loss=loss)
         self.train_fn = K.function(
@@ -271,17 +282,18 @@ class Critic:
         self.build_model()
 
     def build_model(self):
-        # kernel_l2_reg = 1e-7
+        kernel_l2_reg = 1e-5
 
         """Build a critic (value) network that maps (state, action) pairs -> Q-values."""
         # Define input layers
         states = layers.Input(shape=(self.state_size,), name='states')
         actions = layers.Input(shape=(self.action_size,), name='actions')
 
-        # block_size = 32
-        size_repeat = 10
-        block_size = size_repeat*self.state_size + size_repeat*self.action_size
-        print("Critic block size = {}".format(block_size))
+        # size_repeat = 20
+        # state_size = size_repeat*self.state_size
+        # action_size = size_repeat*self.action_size
+        # block_size = size_repeat*self.state_size + size_repeat*self.action_size
+        # print("Critic block size = {}".format(block_size))
 
         # net_states = layers.Dense(state_net_size,
         #                           kernel_initializer=initializers.RandomNormal(mean=1.0, stddev=0.1),
@@ -297,44 +309,54 @@ class Critic:
         #
         # net = layers.concatenate([net_states, net_actions])
 
-        net = layers.concatenate([states]*size_repeat + [actions]*size_repeat)
+        # net = layers.concatenate([states]*size_repeat + [actions]*size_repeat)
 
         # net = layers.concatenate([states, actions])
         # net = layers.Dense(32, activation='relu')(net)
 
-        for _ in range(5):
-            # net = res_block(net, self.state_size + self.action_size)
-            net = res_block(net, block_size)
-            # net = layers.BatchNormalization()(net)
-            # net = layers.Dropout(0.2)(net)
+        # state_net = layers.concatenate([states] * size_repeat)
+        # action_net = layers.concatenate([actions]*size_repeat)
+        # for _ in range(2):
+        #     state_net = res_block(state_net, state_size)
+        #     action_net = res_block(action_net, action_size)
+        #
+        # net = layers.concatenate([state_net, action_net])
+        #
+        # for _ in range(5):
+        #     # net = res_block(net, self.state_size + self.action_size)
+        #     net = res_block(net, block_size)
+        #     # net = layers.BatchNormalization()(net)
+        #     # net = layers.Dropout(0.2)(net)
 
 
         # Add hidden layer(s) for state pathway
-        # states = layers.BatchNormalization()(states)
-        # net_states = layers.Dense(units=512,
-        #                           activation='elu',
+        net_states = layers.Dense(units=300,
+                                  activation='relu',
+                                  # activation=None,
                                   # kernel_initializer='lecun_normal',
                                   # activity_regularizer=regularizers.l2(0.1),
                                   # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                           use_bias=True)(states)
+                                  use_bias=True)(states)
         # net_states = layers.BatchNormalization()(net_states)
         # net_states = layers.AlphaDropout(0.2)(net_states)
         # net_states = layers.LeakyReLU()(net_states)
         # net_states = layers.ELU()(net_states)
 
-        # net_states = layers.Dense(units=1024,
-        #                           activation=None,
+        net_states = layers.Dense(units=400,
+                                  activation='relu',
+                                  # activation=None,
                                   # kernel_initializer='lecun_normal',
                                   # activity_regularizer=regularizers.l2(0.01),
                                   # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-                                  # use_bias=True)(net_states)
+                                  use_bias=True)(net_states)
         # net_states = layers.BatchNormalization()(net_states)
         # net_states = layers.AlphaDropout(0.2)(net_states)
         # net_states = layers.LeakyReLU()(net_states)
         # net_states = layers.ELU()(net_states)
 
-        # net_states = layers.Dense(units=512,
-        #                           activation='elu',
+        # net_states = layers.Dense(units=128,
+        #                           activation='relu',
+                                  # activation=None,
                                   # kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                   # use_bias=True)(net_states)
         # net_states = layers.BatchNormalization()(net_states)
@@ -342,31 +364,33 @@ class Critic:
         # net_states = layers.ELU()(net_states)
 
         # Add hidden layer(s) for action pathway
-        # actions = layers.BatchNormalization()(actions)
-        # net_actions = layers.Dense(units=512,
-        #                            activation=None,
+        net_actions = layers.Dense(units=400,
+                                   activation='relu',
+                                   # activation=None,
                                    # kernel_initializer='lecun_normal',
                                    # activity_regularizer=regularizers.l2(0.1),
                                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                            use_bias=False)(actions)
+                                   use_bias=True)(actions)
         # net_actions = layers.BatchNormalization()(net_actions)
         # net_actions = layers.AlphaDropout(0.2)(net_actions)
         # net_actions = layers.LeakyReLU()(net_actions)
         # net_actions = layers.ELU()(net_actions)
 
-        # net_actions = layers.Dense(units=200,
+        # net_actions = layers.Dense(units=64,
         #                            activation='relu',
+                                   # activation=None,
                                    # activity_regularizer=regularizers.l2(0.01),
                                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                            use_bias=True)(net_actions)
+                                   # use_bias=True)(net_actions)
         # net_actions = layers.BatchNormalization()(net_actions)
         # net_actions = layers.LeakyReLU()(net_actions)
         # net_actions = layers.ELU()(net_actions)
 
-        # net_actions = layers.Dense(units=1024,
+        # net_actions = layers.Dense(units=128,
         #                            activation='relu',
-        #                            kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                            use_bias=True)(net_actions)
+                                   # activation=None,
+                                   # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                                   # use_bias=True)(net_actions)
         # net_actions = layers.BatchNormalization()(net_actions)
         # net_actions = layers.LeakyReLU()(net_actions)
         # net_actions = layers.ELU()(net_actions)
@@ -375,7 +399,7 @@ class Critic:
 
         # Combine state and action pathways
         # net = layers.concatenate([net_states, net_actions])
-        # net = layers.add([net_states, net_actions])
+        net = layers.add([net_states, net_actions])
         # net = layers.BatchNormalization()(net)
         # net = layers.ELU()(net)
         # net = layers.LeakyReLU(alpha=0.01)(net)
@@ -383,20 +407,22 @@ class Critic:
 
         # net_actions = layers.ELU()(net_actions)
 
-        # net = layers.Dense(units=256,
-        #                    activation='elu',
-        #                    # activity_regularizer=regularizers.l2(0.1),
-        #                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                    use_bias=True)(net)
+        net = layers.Dense(units=300,
+                           activation='relu',
+                           # activation=None,
+                           # activity_regularizer=regularizers.l2(0.1),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
         # net = layers.LeakyReLU()(net)
 
-        # net = layers.Dense(units=128,
-        #                    activation='elu',
-        #                    # kernel_initializer='lecun_normal',
-        #                    # activity_regularizer=regularizers.l2(0.01),
-        #                    # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-        #                    use_bias=True)(net)
+        # net = layers.Dense(units=32,
+        #                    activation='relu',
+                           # activation=None,
+                           # kernel_initializer='lecun_normal',
+                           # activity_regularizer=regularizers.l2(0.01),
+                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           # use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
         # net = layers.AlphaDropout(0.2)(net)
         # net = layers.LeakyReLU()(net)
@@ -406,7 +432,7 @@ class Critic:
         Q_values = layers.Dense(units=1,
                                 activation=None,
                                 # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-                                kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3),
+                                # kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3),
                                 # bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                 name='q_values')(net)
 
@@ -414,7 +440,10 @@ class Critic:
         self.model = models.Model(inputs=[states, actions], outputs=Q_values)
 
         # Define optimizer and compile model for training with built-in loss function
-        optimizer = optimizers.Adam(lr=1e-3, clipvalue=0.5)#, beta_1=0.5)
+        optimizer = optimizers.Adam(lr=1e-3,
+                                    # clipvalue=0.5,
+                                    # clipnorm=1.0
+                                    )#, beta_1=0.5)
         # optimizer = optimizers.SGD(lr=1e-6)
         self.model.compile(optimizer=optimizer, loss='mse')
 
@@ -434,9 +463,9 @@ def res_block(inputs, size):
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(inputs)
-    net = layers.BatchNormalization()(net)
-    net = layers.Dropout(0.2)(net)
-    net = layers.LeakyReLU(0.1)(net)
+    # net = layers.BatchNormalization()(net)
+    # net = layers.Dropout(0.2)(net)
+    net = layers.LeakyReLU(0.01)(net)
 
     net = layers.Dense(size,
                        activation=None,
@@ -444,15 +473,54 @@ def res_block(inputs, size):
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(net)
-    net = layers.BatchNormalization()(net)
-    net = layers.Dropout(0.2)(net)
+    # net = layers.BatchNormalization()(net)
+    # net = layers.Dropout(0.2)(net)
     net = layers.add([inputs, net])
-    net = layers.LeakyReLU(0.1)(net)
+    # net = layers.BatchNormalization()(net)
+    net = layers.LeakyReLU(0.01)(net)
     return net
+
+# class ReplayBuffer:
+#     """Fixed-size buffer to store experience tuples."""
+#
+#     def __init__(self, buffer_size, batch_size):
+#         """Initialize a ReplayBuffer object.
+#         Params
+#         ======
+#             buffer_size: maximum size of buffer
+#             batch_size: size of each training batch
+#         """
+#         self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
+#         self.batch_size = batch_size
+#         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
+#
+#     def add(self, state, action, reward, next_state, done):
+#         """Add a new experience to memory."""
+#         if np.all([state, action, reward, next_state, done] is not None):
+#             e = self.experience(state, action, reward, next_state, done)
+#             self.memory.append(e)
+#
+#     def sample(self):
+#         """Randomly sample a batch of experiences from memory."""
+#         # return random.sample(self.memory, k=self.batch_size)
+#         self.batch_index = np.random.choice(np.arange(len(self.memory)), self.batch_size, replace=False)
+#
+#         states = np.vstack([self.memory[i].state for i in self.batch_index])
+#         actions = np.array([self.memory[i].action for i in self.batch_index]).astype(np.float32).reshape(self.batch_size, -1)
+#         rewards = np.array([self.memory[i].reward for i in self.batch_index]).astype(np.float32).reshape(-1, 1)
+#         next_states = np.vstack([self.memory[i].next_state for i in self.batch_index])
+#         dones = np.array([self.memory[i].done for i in self.batch_index]).astype(np.uint8).reshape(-1, 1)
+#
+#         return states, actions, rewards, next_states, dones
+#         # return self.memory[self.batch_index]
+#
+#     def __len__(self):
+#         """Return the current size of internal memory."""
+#         return len(self.memory)
+
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
-
     def __init__(self, buffer_size, batch_size):
         """Initialize a ReplayBuffer object.
         Params
@@ -460,52 +528,100 @@ class ReplayBuffer:
             buffer_size: maximum size of buffer
             batch_size: size of each training batch
         """
-        self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
+        self.buffer_size = buffer_size
+        self.memory = np.empty(buffer_size, dtype=object)
+        self.p = np.zeros(buffer_size)
+        self.next_index = 0
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
 
-        self.batch_index = None
-        self.p = None
-
-        self.staged = []
+        self.state_norm = None
+        self.action_norm = None
+        self.reward_norm = None
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
         if np.all([state, action, reward, next_state, done] is not None):
+
+            # Build normalizers on first data sample
+            if self.state_norm is None:
+                self.state_norm = Normalizer(shape=state.shape, dtype=state.dtype)
+
+            if self.action_norm is None:
+                self.action_norm = Normalizer(shape=action.shape, dtype=action.dtype)
+
+            if self.reward_norm is None:
+                self.reward_norm = Normalizer(shape=reward.shape, dtype=reward.dtype)
+
+            # Update our normalizer
+            self.state_norm.update(state)
+            self.action_norm.update(action)
+            self.reward_norm.update(reward)
+            self.state_norm.update(next_state)
+
+            # Build experience and add to ring buffer
             e = self.experience(state, action, reward, next_state, done)
-            self.memory.append([e, 0.0])
+            self.memory[self.next_index] = e
+            self.p[self.next_index] = 1
+            self.next_index = (self.next_index + 1)%self.buffer_size
 
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         # return random.sample(self.memory, k=self.batch_size)
+        batch = random.sample(list(self.memory[self.p == 1]), self.batch_size)
 
-        # Prioritized experience replay
-        self.update_p()
-        self.batch_index = np.random.choice(np.arange(len(self.memory)), self.batch_size, p=self.p, replace=False)
+        states = np.vstack([e.state for e in batch])
+        actions = np.array([e.action for e in batch]).astype(np.float32).reshape(self.batch_size, -1)
+        rewards = np.array([e.reward for e in batch]).astype(np.float32).reshape(-1, 1)
+        next_states = np.vstack([e.next_state for e in batch])
+        dones = np.array([e.done for e in batch]).astype(np.uint8).reshape(-1, 1)
 
-        states = np.vstack([self.memory[i][0].state for i in self.batch_index])
-        actions = np.array([self.memory[i][0].action for i in self.batch_index]).astype(np.float32).reshape(self.batch_size, -1)
-        rewards = np.array([self.memory[i][0].reward for i in self.batch_index]).astype(np.float32).reshape(-1, 1)
-        next_states = np.vstack([self.memory[i][0].next_state for i in self.batch_index])
-        dones = np.array([self.memory[i][0].done for i in self.batch_index]).astype(np.uint8).reshape(-1, 1)
+        # Normalize if possible
+        if self.state_norm is not None:
+            states = self.state_norm.normalize(states)
+            next_states = self.state_norm.normalize(next_states)
+
+        if self.action_norm is not None:
+            actions = self.action_norm.normalize(actions)
+
+        if self.reward_norm is not None:
+            rewards = self.reward_norm.normalize(rewards)
 
         return states, actions, rewards, next_states, dones
-        # return self.memory[self.batch_index]
-
-    def update_Q(self, Q_targets_next):
-        self.staged.append([self.batch_index, Q_targets_next.ravel()])
-
-    def update_p(self):
-        for batch_index, Q_targets_next in self.staged:
-            for q_index, memory_index in enumerate(batch_index):
-                self.memory[memory_index][1] = Q_targets_next[q_index]
-
-        error = np.array([(q - e.reward[0]) ** 2 for e, q in self.memory])
-        self.p = error/np.sum(error)
 
     def __len__(self):
         """Return the current size of internal memory."""
-        return len(self.memory)
+        return int(sum(self.p))
+
+
+class Normalizer:
+    def __init__(self, shape, dtype):
+        self.shape = shape
+        self.dtype = dtype
+        self.alpha = 1e-2 ** 2
+
+        self.mean = np.zeros(shape, dtype=dtype)
+        self.std = np.ones(shape, dtype=dtype)
+
+        self.sums = np.zeros(shape, dtype=dtype)
+        self.sqrs = np.zeros(shape, dtype=dtype)
+        self.n = 0
+
+    def update(self, x):
+        self.n += 1
+        self.sums += x
+        self.sqrs += x*x
+
+        self.mean = self.sums/float(self.n)
+        self.std = np.sqrt(np.maximum(self.alpha, self.sqrs / float(self.n) - self.mean*self.mean))
+
+    def normalize(self, x):
+        return (x - self.mean)/self.std
+
+    def denormalize(self, x):
+        return x*self.std + self.mean
+
+
 
 
 class OUNoise:

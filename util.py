@@ -63,6 +63,7 @@ def plot_run(results):
     plt.plot(results['time'], results['z'], label='z')
     plt.xlabel('time, seconds')
     plt.ylabel('Position')
+    plt.grid(True)
     plt.legend()
 
     plt.subplot(3, 3, 2)
@@ -72,6 +73,7 @@ def plot_run(results):
     plt.plot(results['time'], results['z_velocity'], label='z')
     plt.xlabel('time, seconds')
     plt.ylabel('Velocity')
+    plt.grid(True)
     plt.legend()
 
     plt.subplot(3, 3, 3)
@@ -80,6 +82,7 @@ def plot_run(results):
     plt.plot(results['time'], normalize_angle(results['theta']), label='theta')
     plt.plot(results['time'], normalize_angle(results['psi']), label='psi')
     plt.xlabel('time, seconds')
+    plt.grid(True)
     plt.legend()
 
     plt.subplot(3, 3, 4)
@@ -88,6 +91,7 @@ def plot_run(results):
     plt.plot(results['time'], results['theta_velocity'], label='theta')
     plt.plot(results['time'], results['psi_velocity'], label='psi')
     plt.xlabel('time, seconds')
+    plt.grid(True)
     plt.legend()
 
     plt.subplot(3, 3, 5)
@@ -98,13 +102,20 @@ def plot_run(results):
     plt.plot(results['time'], results['rotor_speed4'], label='Rotor 4')
     plt.xlabel('time, seconds')
     plt.ylabel('Rotor Speed, revolutions / second')
+    plt.grid(True)
     plt.legend()
 
     plt.subplot(3, 3, 6)
     plt.title('Reward')
     plt.plot(results['time'], results['reward'], label='Reward')
     plt.xlabel('time, seconds')
-    plt.legend()
+    plt.ylabel('Reward')
+    plt.legend(loc=3)
+    plt.twinx()
+    plt.plot(results['time'], np.cumsum(results['reward']), color='xkcd:red', label='Accum. Reward')
+    plt.ylabel('Accumulated Reward')
+    plt.legend(loc=4)
+    plt.grid(True)
     plt.tight_layout()
     plt.show()
 

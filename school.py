@@ -14,9 +14,9 @@ class FlightShool:
         self.curriculum_index = 0
         self.curriculum = [
             [[0, 1, 2, 3]],  # Elevation
-            [[0, 2], [1, 3]],  # Yaw
-            [[0, 1], [2, 3]],  # Pitch
-            [[0, 3], [1, 2]],  # Roll
+            [[0, 2], [1, 3]],  # Yaw, about z
+            [[2, 3], [0, 1]],  # Pitch, about y
+            [[0, 3], [1, 2]],  # Roll, about x
 
             # [[1, 2, 3]], # Single rotor
             # [[0, 2, 3]],
@@ -29,13 +29,17 @@ class FlightShool:
         # self.max_sigma = 2.0
 
         self.soft_score = None
-        self.gamma = 0.99
+        self.gamma = 0.98
 
         self.review_rate = 0.10
 
         # Create a initial grade set that forces progression
         # increasing the high will slow graduating to next class
-        self.grades = -np.linspace(20, 0, len(self.curriculum))**2
+        # self.grades = -np.linspace(50, 10, len(self.curriculum))**2
+        # self.grades = -np.logspace(np.log10(250), np.log10(100), len(self.curriculum))
+        # self.grades = np.array([-250, -175, -175, -175, -150])
+        # self.grades = np.array([-250, -250, -250, -250, -225])
+        self.grades = np.ones(len(self.curriculum))
 
         # self.noise = OUNoise(size=action_space, mu=0.0, theta=theta, sigma=sigma)
 
@@ -96,22 +100,31 @@ class FlightShool:
         p = p / np.sum(p)
         return p[np.argsort(self.grades)]
 
+    def weighted_policy(self, epsilon):
+        g_max = np.max(self.grades)
+        g_min = np.min(self.grades)
+        p = g_max - self.grades + epsilon * (g_max - g_min)
+        p = p**2
+        return p/np.sum(p)
+
     def update_p(self, score):
         # self.p = np.zeros(len(self.curriculum))
         # self.p[:max(1, self.curriculum_index)] = self.review_rate/ max(1, self.curriculum_index)
         # self.p[self.curriculum_index] += 1 - self.review_rate
         self.grades[self.curriculum_index] = self.soft_update(self.grades[self.curriculum_index], score, self.gamma)
         # self.p = self.epsilon_greedy(self.review_rate)
-        self.p = self.ranked_policy(self.review_rate)
+        # self.p = self.ranked_policy(self.review_rate)
+        self.p = self.weighted_policy(self.review_rate)
 
     def grade(self, score):
         # self.noise.reset()
         # self.update_soft_score(score)
         # self.update_patience(score)
         # self.update_score(self.soft_score)
-        self.update_p(score)
+        # self.update_p(score)
 
-        self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)), p=self.p)
+        self.grades[self.curriculum_index] = self.soft_update(self.grades[self.curriculum_index], score, self.gamma)
+        # self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)), p=self.p)
 
         # if self.patience_count > self.patience and self.curriculum_index < len(self.curriculum)-1:
         #     print("  Graduating!!!!")
@@ -122,6 +135,11 @@ class FlightShool:
         #     self.best_score = -np.inf
         #     self.soft_score = self.worst_score
         #     self.update_p()
+
+    def assign_lesson(self, lesson_id=None):
+        # self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)), p=self.p)
+        self.curriculum_index = (self.curriculum_index + 1)%len(self.curriculum)
+        # self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)))
 
     def soft_update(self, old, new, gamma):
         if old is None:
