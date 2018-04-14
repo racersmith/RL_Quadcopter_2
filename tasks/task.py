@@ -35,11 +35,11 @@ class Task():
         # self.action_repeat = 3
 
         # self.state_size = self.action_repeat * 6
-        self.state_size = 12
+        self.state_size = 2
         hover = 403.929915
-        self.action_low = 0.95 * hover  # Avoid a div0 error in physic sim
-        self.action_high = 1.05 * hover
-        self.action_size = 4
+        self.action_low = 0.97 * hover  # Avoid a div0 error in physic sim
+        self.action_high = 1.02 * hover
+        self.action_size = 1
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
@@ -70,15 +70,16 @@ class Task():
         # return np.prod(reward)
 
         # Positional error
-        penalty = 0.25 * np.linalg.norm((self.sim.pose[:3] - self.target_pos) * (1.0, 1.0, 2.0))**2
+        penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))**2
+        return max(-1, -penalty)
         # penalty += 0.1 * np.linalg.norm(self.normalize_angles(self.sim.pose[3:]))
 
         # Heading error
-        penalty += 0.1 * abs(self.normalize_angles(self.sim.pose[-1:]))**2
+        # penalty += 0.1 * abs(self.normalize_angles(self.sim.pose[-1:]))**2
 
         # Angular velocity
-        penalty += 0.1 * np.linalg.norm((self.sim.angular_v))**2
-        return 1/(penalty + 1)  # turn the penalty into a reward
+        # penalty += 0.1 * np.linalg.norm((self.sim.angular_v))**2
+        # return 1/(penalty + 1)  # turn the penalty into a reward
 
         # Penalty for velocity
         # reward += 0.333 / (np.log(np.linalg.norm(self.sim.v) + 1) + 1)
@@ -99,27 +100,28 @@ class Task():
         for i in range(len(norm_angles)):
             while norm_angles[i] > np.pi:
                 norm_angles[i] -= 2 * np.pi
-        return norm_angles/np.pi
+        return norm_angles
 
     def get_state(self):
-        pos_error = (self.sim.pose[:3] - self.target_pos)/10.0
-        orientation = self.normalize_angles(self.sim.pose[3:])  # Normalize angles to +/- 1
-        state_list = list()
-        state_list.append(pos_error)
-        state_list.append(orientation)
-        state_list.append(self.sim.v)
-        state_list.append(self.sim.angular_v)
-        return np.concatenate(state_list)
+        pos_error = (self.sim.pose[:3] - self.target_pos)
+        return np.array([pos_error[-1], self.sim.v[-1]])
+        # orientation = self.normalize_angles(self.sim.pose[3:])
+        # state_list = list()
+        # state_list.append(pos_error)
+        # state_list.append(orientation)
+        # state_list.append(self.sim.v)
+        # state_list.append(self.sim.angular_v)
+        # return np.concatenate(state_list)
 
     def step(self, rotor_speeds):
         """Uses action to obtain next state, reward, done."""
         # update sim
 
         # Single action for vertical only
-        # done = self.sim.next_timestep(rotor_speeds*np.ones(4))
+        done = self.sim.next_timestep(rotor_speeds*np.ones(4))
 
         # Full action space
-        done = self.sim.next_timestep(rotor_speeds)
+        # done = self.sim.next_timestep(rotor_speeds)
 
         # Create state values
         next_state = self.get_state()
@@ -128,7 +130,7 @@ class Task():
         reward = self.get_reward()
 
         # Give some clear end of episode signals on altitude
-        if done:
+        # if done:
             # # Lost massive altitude
             # if next_state[2] < -8.0:
             #     reward -= 5
@@ -141,10 +143,10 @@ class Task():
             # if abs(next_state[2]) < 8.0:
             #     reward += 5.0
 
-            if np.linalg.norm(self.sim.pose[:3] - self.target_pos) < 5:
-                reward += 10
-            else:
-                reward -= 10
+            # if np.linalg.norm(self.sim.pose[:3] - self.target_pos) < 5:
+            #     reward += 10
+            # else:
+            #     reward -= 10
 
             # reward += 10/(np.linalg.norm(self.sim.pose[:3] - self.target_pos))
 

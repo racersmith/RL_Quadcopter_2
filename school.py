@@ -138,7 +138,13 @@ class FlightShool:
 
     def assign_lesson(self, lesson_id=None):
         # self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)), p=self.p)
-        self.curriculum_index = (self.curriculum_index + 1)%len(self.curriculum)
+        if lesson_id is None:
+            self.curriculum_index = (self.curriculum_index + 1) % len(self.curriculum)
+        else:
+            if lesson_id >= 0:
+                self.curriculum_index = lesson_id % len(self.curriculum)
+            else:
+                self.curriculum_index = len(self.curriculum)-1
         # self.curriculum_index = np.random.choice(np.arange(len(self.curriculum)))
 
     def soft_update(self, old, new, gamma):
