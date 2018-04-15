@@ -4,6 +4,8 @@ import random
 from collections import namedtuple, deque
 import tensorflow as tf
 
+from memory import RingBuffer as ReplayBuffer
+
 # from keras import layers, models, optimizers
 # from keras import backend as K
 
@@ -95,8 +97,8 @@ class DDPG():
     def act(self, states):
         """Returns actions for given state(s) as per current policy with added noise for exploration."""
         # normalize state
-        # if self.memory.state_norm is not None:
-        #     states = self.memory.state_norm.normalize(states)
+        if hasattr(self.memory, 'state_norm') and self.memory.state_norm is not None:
+            states = self.memory.state_norm.normalize(states)
 
         state = np.reshape(states, [-1, self.state_size])
 
@@ -190,35 +192,38 @@ class Actor:
         # Add hidden layers
         # states = layers.BatchNormalization()(states)
         net = layers.Dense(units=300,
-                           activation='relu',
-                           # activation=None,
+                           # activation='relu',
+                           activation=None,
                            # kernel_initializer='lecun_normal',
                            # activity_regularizer=regularizers.l2(0.1),
                            kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           # bias_initializer=initializers.Constant(1e-2),
                            use_bias=True)(states)
-        net = layers.BatchNormalization()(net)
-        # net = layers.LeakyReLU()(net)
+        # net = layers.BatchNormalization()(net)
+        net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
 
         net = layers.Dense(units=400,
-                           activation='relu',
-                           # activation=None,
+                           # activation='relu',
+                           activation=None,
                            # kernel_initializer='lecun_normal',
                            # activity_regularizer=regularizers.l2(0.01),
                            kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           # bias_initializer=initializers.Constant(1e-2),
                            use_bias=True)(net)
-        net = layers.BatchNormalization()(net)
-        # net = layers.LeakyReLU()(net)
+        # net = layers.BatchNormalization()(net)
+        net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
         #
-        # net = layers.Dense(units=200,
-        #                    activation='relu',
-                           # activation=None,
+        net = layers.Dense(units=200,
+                           # activation='relu',
+                           activation=None,
                            # activity_regularizer=regularizers.l2(0.01),
-                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-                           # use_bias=True)(net)
+                           kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           # bias_initializer=initializers.Constant(1e-2),
+                           use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
-        # net = layers.LeakyReLU()(net)
+        net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
 
         # net = layers.Dense(units=32,
@@ -338,25 +343,27 @@ class Critic:
 
         # Add hidden layer(s) for state pathway
         net_states = layers.Dense(units=300,
-                                  activation='relu',
-                                  # activation=None,
+                                  # activation='relu',
+                                  activation=None,
                                   # kernel_initializer='lecun_normal',
                                   # activity_regularizer=regularizers.l2(0.1),
                                   kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                                  # bias_initializer=initializers.Constant(1e-2),
                                   use_bias=True)(states)
-        net_states = layers.BatchNormalization()(net_states)
-        # net_states = layers.LeakyReLU()(net_states)
+        # net_states = layers.BatchNormalization()(net_states)
+        net_states = layers.LeakyReLU(1e-2)(net_states)
         # net_states = layers.ELU()(net_states)
 
         net_states = layers.Dense(units=400,
-                                  activation='relu',
-                                  # activation=None,
+                                  # activation='relu',
+                                  activation=None,
                                   # kernel_initializer='lecun_normal',
                                   # activity_regularizer=regularizers.l2(0.01),
                                   kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                                  # bias_initializer=initializers.Constant(1e-2),
                                   use_bias=True)(net_states)
-        net_states = layers.BatchNormalization()(net_states)
-        # net_states = layers.LeakyReLU()(net_states)
+        # net_states = layers.BatchNormalization()(net_states)
+        net_states = layers.LeakyReLU(1e-2)(net_states)
         # net_states = layers.ELU()(net_states)
 
         # net_states = layers.Dense(units=128,
@@ -370,14 +377,15 @@ class Critic:
 
         # Add hidden layer(s) for action pathway
         net_actions = layers.Dense(units=400,
-                                   activation='relu',
-                                   # activation=None,
+                                   # activation='relu',
+                                   activation=None,
                                    # kernel_initializer='lecun_normal',
                                    # activity_regularizer=regularizers.l2(0.1),
                                    kernel_regularizer=regularizers.l2(kernel_l2_reg),
-                                   use_bias=True)(actions)
+                                   # bias_initializer=initializers.Constant(1e-2),
+                                   use_bias=False)(actions)
         net_actions = layers.BatchNormalization()(net_actions)
-        # net_actions = layers.LeakyReLU()(net_actions)
+        net_actions = layers.LeakyReLU(1e-2)(net_actions)
         # net_actions = layers.ELU()(net_actions)
 
         # net_actions = layers.Dense(units=64,
@@ -420,16 +428,16 @@ class Critic:
         # net = layers.BatchNormalization()(net)
         # net = layers.LeakyReLU()(net)
 
-        # net = layers.Dense(units=32,
-        #                    activation='relu',
-                           # activation=None,
+        net = layers.Dense(units=32,
+                           # activation='relu',
+                           activation=None,
                            # kernel_initializer='lecun_normal',
                            # activity_regularizer=regularizers.l2(0.01),
-                           # kernel_regularizer=regularizers.l2(kernel_l2_reg),
-                           # use_bias=True)(net)
+                           kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                           # bias_initializer=initializers.Constant(1e-2),
+                           use_bias=True)(net)
         # net = layers.BatchNormalization()(net)
-        # net = layers.AlphaDropout(0.2)(net)
-        # net = layers.LeakyReLU()(net)
+        net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
 
         # Add final output layer to prduce action values (Q values)
@@ -444,7 +452,7 @@ class Critic:
         self.model = models.Model(inputs=[states, actions], outputs=Q_values)
 
         # Define optimizer and compile model for training with built-in loss function
-        optimizer = optimizers.Adam(lr=1e-4,
+        optimizer = optimizers.Adam(lr=1e-5,
                                     # clipvalue=0.5,
                                     # clipnorm=1.0
                                     )#, beta_1=0.5)
@@ -461,19 +469,21 @@ class Critic:
 
 
 def res_block(inputs, size):
+    kernel_l2_reg = 1e-5
+
     net = layers.Dense(size,
                        activation=None,
-                       # kernel_regularizer=regularizers.l2(1e-3)
+                       # kernel_regularizer=regularizers.l2(kernel_l2_reg)
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(inputs)
     # net = layers.BatchNormalization()(net)
     # net = layers.Dropout(0.2)(net)
-    net = layers.LeakyReLU(0.01)(net)
+    net = layers.LeakyReLU(1e-2)(net)
 
     net = layers.Dense(size,
                        activation=None,
-                       # kernel_regularizer=regularizers.l2(1e-3)
+                       # kernel_regularizer=regularizers.l2(kernel_l2_reg)
                        # kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                        # bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.001),
                        )(net)
@@ -481,46 +491,47 @@ def res_block(inputs, size):
     # net = layers.Dropout(0.2)(net)
     net = layers.add([inputs, net])
     # net = layers.BatchNormalization()(net)
-    net = layers.LeakyReLU(0.01)(net)
+    net = layers.LeakyReLU(1e-2)(net)
     return net
 
-class ReplayBuffer:
-    """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, buffer_size, batch_size):
-        """Initialize a ReplayBuffer object.
-        Params
-        ======
-            buffer_size: maximum size of buffer
-            batch_size: size of each training batch
-        """
-        self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
-        self.batch_size = batch_size
-        self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-
-    def add(self, state, action, reward, next_state, done):
-        """Add a new experience to memory."""
-        if np.all([state, action, reward, next_state, done] is not None):
-            e = self.experience(state, action, reward, next_state, done)
-            self.memory.append(e)
-
-    def sample(self):
-        """Randomly sample a batch of experiences from memory."""
-        # return random.sample(self.memory, k=self.batch_size)
-        self.batch_index = np.random.choice(np.arange(len(self.memory)), self.batch_size, replace=False)
-
-        states = np.vstack([self.memory[i].state for i in self.batch_index])
-        actions = np.array([self.memory[i].action for i in self.batch_index]).astype(np.float32).reshape(self.batch_size, -1)
-        rewards = np.array([self.memory[i].reward for i in self.batch_index]).astype(np.float32).reshape(-1, 1)
-        next_states = np.vstack([self.memory[i].next_state for i in self.batch_index])
-        dones = np.array([self.memory[i].done for i in self.batch_index]).astype(np.uint8).reshape(-1, 1)
-
-        return states, actions, rewards, next_states, dones
-        # return self.memory[self.batch_index]
-
-    def __len__(self):
-        """Return the current size of internal memory."""
-        return len(self.memory)
+# class ReplayBuffer:
+#     """Fixed-size buffer to store experience tuples."""
+#
+#     def __init__(self, buffer_size, batch_size):
+#         """Initialize a ReplayBuffer object.
+#         Params
+#         ======
+#             buffer_size: maximum size of buffer
+#             batch_size: size of each training batch
+#         """
+#         self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
+#         self.batch_size = batch_size
+#         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
+#
+#     def add(self, state, action, reward, next_state, done):
+#         """Add a new experience to memory."""
+#         if np.all([state, action, reward, next_state, done] is not None):
+#             e = self.experience(state, action, reward, next_state, done)
+#             self.memory.append(e)
+#
+#     def sample(self):
+#         """Randomly sample a batch of experiences from memory."""
+#         # return random.sample(self.memory, k=self.batch_size)
+#         self.batch_index = np.random.choice(np.arange(len(self.memory)), self.batch_size, replace=False)
+#
+#         states = np.vstack([self.memory[i].state for i in self.batch_index])
+#         actions = np.array([self.memory[i].action for i in self.batch_index]).astype(np.float32).reshape(self.batch_size, -1)
+#         rewards = np.array([self.memory[i].reward for i in self.batch_index]).astype(np.float32).reshape(-1, 1)
+#         next_states = np.vstack([self.memory[i].next_state for i in self.batch_index])
+#         dones = np.array([self.memory[i].done for i in self.batch_index]).astype(np.uint8).reshape(-1, 1)
+#
+#         return states, actions, rewards, next_states, dones
+#         # return self.memory[self.batch_index]
+#
+#     def __len__(self):
+#         """Return the current size of internal memory."""
+#         return len(self.memory)
 
 
 # class ReplayBuffer:
@@ -599,57 +610,57 @@ class ReplayBuffer:
 #         return int(sum(self.p))
 
 
-class Normalizer:
-    """
-    Online normalizer to normalize array to 0 mean and unit variance.
+# class Normalizer:
+#     """
+#     Online normalizer to normalize array to 0 mean and unit variance.
+#
+#     Based on the work here:
+#     https://github.com/keras-rl/keras-rl/blob/master/rl/util.py
+#     """
+#     def __init__(self, shape, dtype):
+#         self.shape = shape
+#         self.dtype = dtype
+#         self.epsilon = 1e-2 ** 2
+#
+#         self.mean = np.zeros(shape, dtype=dtype)
+#         self.std = np.ones(shape, dtype=dtype)
+#
+#         self.sums = np.zeros(shape, dtype=dtype)
+#         self.sqrs = np.zeros(shape, dtype=dtype)
+#         self.n = 0
+#
+#     def update(self, x):
+#         self.n += 1
+#         self.sums += x
+#         self.sqrs += x*x
+#
+#         self.mean = self.sums/float(self.n)
+#         self.std = np.sqrt(np.maximum(self.epsilon, self.sqrs / float(self.n) - self.mean*self.mean))
+#
+#     def normalize(self, x):
+#         return (x - self.mean)/self.std
+#
+#     def denormalize(self, x):
+#         return x*self.std + self.mean
 
-    Based on the work here:
-    https://github.com/keras-rl/keras-rl/blob/master/rl/util.py
-    """
-    def __init__(self, shape, dtype):
-        self.shape = shape
-        self.dtype = dtype
-        self.epsilon = 1e-2 ** 2
 
-        self.mean = np.zeros(shape, dtype=dtype)
-        self.std = np.ones(shape, dtype=dtype)
-
-        self.sums = np.zeros(shape, dtype=dtype)
-        self.sqrs = np.zeros(shape, dtype=dtype)
-        self.n = 0
-
-    def update(self, x):
-        self.n += 1
-        self.sums += x
-        self.sqrs += x*x
-
-        self.mean = self.sums/float(self.n)
-        self.std = np.sqrt(np.maximum(self.epsilon, self.sqrs / float(self.n) - self.mean*self.mean))
-
-    def normalize(self, x):
-        return (x - self.mean)/self.std
-
-    def denormalize(self, x):
-        return x*self.std + self.mean
-
-
-class OUNoise:
-    """Ornstein-Uhlenbeck process."""
-
-    def __init__(self, size, mu, theta, sigma):
-        """Initialize parameters and noise process."""
-        self.mu = mu * np.ones(size)
-        self.theta = theta
-        self.sigma = sigma
-        self.reset()
-
-    def reset(self):
-        """Reset the internal state (= noise) to mean (mu)."""
-        self.state = self.mu
-
-    def sample(self):
-        """Update internal state and return it as a noise sample."""
-        x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
-        self.state = x + dx
-        return self.state
+# class OUNoise:
+#     """Ornstein-Uhlenbeck process."""
+#
+#     def __init__(self, size, mu, theta, sigma):
+#         """Initialize parameters and noise process."""
+#         self.mu = mu * np.ones(size)
+#         self.theta = theta
+#         self.sigma = sigma
+#         self.reset()
+#
+#     def reset(self):
+#         """Reset the internal state (= noise) to mean (mu)."""
+#         self.state = self.mu
+#
+#     def sample(self):
+#         """Update internal state and return it as a noise sample."""
+#         x = self.state
+#         dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(len(x))
+#         self.state = x + dx
+#         return self.state

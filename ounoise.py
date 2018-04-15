@@ -12,8 +12,12 @@ class OUNoise:
         self.sigma = sigma
         self.reset()
 
-    def reset(self):
+    def reset(self, decay=None, sigma_min=None):
         """Reset the internal state (= noise) to mean (mu)."""
+
+        if decay is not None and sigma_min is not None:
+            self.sigma = max((1-decay) * self.sigma, sigma_min)
+
         self.state = np.copy(self.mu)
 
     def sample(self):

@@ -35,11 +35,11 @@ class Task():
         # self.action_repeat = 3
 
         # self.state_size = self.action_repeat * 6
-        self.state_size = 2
+        self.state_size = len(self.get_state())
         hover = 403.929915
         self.action_low = 0.97 * hover  # Avoid a div0 error in physic sim
         self.action_high = 1.02 * hover
-        self.action_size = 1
+        self.action_size = 4
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
@@ -70,8 +70,14 @@ class Task():
         # return np.prod(reward)
 
         # Positional error
-        penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))**2
-        return max(-1, -penalty)
+        penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
+        # reward = 1/(1+penalty)
+
+        return self.reward_from_huber_loss(penalty, delta=0.15, max_reward=1, min_reward=0)
+
+        # reward = 1 - 0.5*penalty
+
+        # return np.clip(reward, -1, 1)
         # penalty += 0.1 * np.linalg.norm(self.normalize_angles(self.sim.pose[3:]))
 
         # Heading error
@@ -89,6 +95,9 @@ class Task():
 
         # return reward
 
+    def reward_from_huber_loss(self, x, delta, max_reward=1, min_reward=0):
+        return np.maximum(max_reward - delta * delta * (np.sqrt(1 + (x / delta) ** 2) - 1), min_reward)
+
     def reward_func(self, x):
         # return 1.0/(np.linalg.norm(x) + 1.0)
         return 1.0 / (np.log((np.linalg.norm(x) + 1.0)) + 1.0)
@@ -104,24 +113,25 @@ class Task():
 
     def get_state(self):
         pos_error = (self.sim.pose[:3] - self.target_pos)
-        return np.array([pos_error[-1], self.sim.v[-1]])
-        # orientation = self.normalize_angles(self.sim.pose[3:])
-        # state_list = list()
-        # state_list.append(pos_error)
-        # state_list.append(orientation)
-        # state_list.append(self.sim.v)
-        # state_list.append(self.sim.angular_v)
-        # return np.concatenate(state_list)
+        # return np.array([pos_error[-1], self.sim.v[-1]])
+        orientation = self.normalize_angles(self.sim.pose[3:])
+        state_list = list()
+        state_list.append(pos_error)
+        state_list.append(orientation)
+        state_list.append(self.sim.v)
+        state_list.append(self.sim.angular_v)
+        # state_list.append([self.sim.time])
+        return np.concatenate(state_list)
 
     def step(self, rotor_speeds):
         """Uses action to obtain next state, reward, done."""
         # update sim
 
         # Single action for vertical only
-        done = self.sim.next_timestep(rotor_speeds*np.ones(4))
+        # done = self.sim.next_timestep(rotor_speeds*np.ones(4))
 
         # Full action space
-        # done = self.sim.next_timestep(rotor_speeds)
+        done = self.sim.next_timestep(rotor_speeds)
 
         # Create state values
         next_state = self.get_state()
@@ -149,6 +159,10 @@ class Task():
             #     reward -= 10
 
             # reward += 10/(np.linalg.norm(self.sim.pose[:3] - self.target_pos))
+
+        # tack on the penalty resulting from ending early
+        # if done and self.sim.time < self.sim.runtime:
+        #     reward += reward * (self.sim.runtime - self.sim.time)/self.sim.dt
 
         return next_state, reward, done
 
