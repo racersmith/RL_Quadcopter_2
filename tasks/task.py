@@ -29,17 +29,19 @@ class Task():
         self.vel_noise = vel_noise
         self.ang_vel_noise = ang_vel_noise
 
-
         # Simulation
-        self.sim = PhysicsSim(init_pose, init_velocities, init_angle_velocities, runtime) 
-        # self.action_repeat = 3
+        self.sim = PhysicsSim(init_pose, init_velocities, init_angle_velocities, runtime)
 
         # self.state_size = self.action_repeat * 6
         self.state_size = len(self.get_state())
         hover = 403.929915
-        self.action_low = 0.97 * hover  # Avoid a div0 error in physic sim
-        self.action_high = 1.02 * hover
-        self.action_size = 4
+        self.action_low = 0.8 * hover  # Avoid a div0 error in physic sim
+        self.action_high = 1.1 * hover
+        self.action_size = 1
+
+        # Conversion constants for tanh activation
+        self.action_m = (self.action_high-self.action_low)/2.0
+        self.action_b = (self.action_high+self.action_low)/2.0
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
@@ -70,10 +72,11 @@ class Task():
         # return np.prod(reward)
 
         # Positional error
-        penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
+        # penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
         # reward = 1/(1+penalty)
+        return np.clip(1-(self.sim.pose[2]-self.target_pos[2])**2, 0, 1)
 
-        return self.reward_from_huber_loss(penalty, delta=0.15, max_reward=1, min_reward=0)
+        # return self.reward_from_huber_loss(penalty, delta=1, max_reward=1, min_reward=0)
 
         # reward = 1 - 0.5*penalty
 
@@ -102,7 +105,6 @@ class Task():
         # return 1.0/(np.linalg.norm(x) + 1.0)
         return 1.0 / (np.log((np.linalg.norm(x) + 1.0)) + 1.0)
 
-
     def normalize_angles(self, angles):
         # Normalize angles to +/- 1
         norm_angles = np.copy(angles)
@@ -113,25 +115,30 @@ class Task():
 
     def get_state(self):
         pos_error = (self.sim.pose[:3] - self.target_pos)
-        # return np.array([pos_error[-1], self.sim.v[-1]])
-        orientation = self.normalize_angles(self.sim.pose[3:])
-        state_list = list()
-        state_list.append(pos_error)
-        state_list.append(orientation)
-        state_list.append(self.sim.v)
-        state_list.append(self.sim.angular_v)
+        return np.array([pos_error[2], self.sim.v[2]])
+        # orientation = self.normalize_angles(self.sim.pose[3:])
+        # state_list = list()
+        # state_list.append(pos_error)
+        # state_list.append(orientation)
+        # state_list.append(self.sim.v)
+        # state_list.append(self.sim.angular_v)
         # state_list.append([self.sim.time])
-        return np.concatenate(state_list)
+        # return np.concatenate(state_list)
 
-    def step(self, rotor_speeds):
+    def convert_action(self, action):
+        return action*self.action_m + self.action_b
+
+    def step(self, action):
         """Uses action to obtain next state, reward, done."""
-        # update sim
 
+        rotor_speeds = self.convert_action(action)
+
+        # update sim
         # Single action for vertical only
-        # done = self.sim.next_timestep(rotor_speeds*np.ones(4))
+        done = self.sim.next_timestep(rotor_speeds*np.ones(4))
 
         # Full action space
-        done = self.sim.next_timestep(rotor_speeds)
+        # done = self.sim.next_timestep(rotor_speeds)
 
         # Create state values
         next_state = self.get_state()
@@ -169,6 +176,25 @@ class Task():
     def reset(self):
         """Reset the sim to start a new episode."""
         self.sim.reset()
+
+        if self.action_size == 1:
+            # Randomize the start pose
+            if self.pos_noise is not None or self.ang_noise is not None:
+                rand_pose = np.copy(self.sim.init_pose)
+                if self.pos_noise is not None and self.pos_noise > 0:
+                    rand_pose[2] += np.random.normal(0.0, self.pos_noise, 1)
+
+                self.sim.pose = np.copy(rand_pose)
+
+            # Randomize starting velocity
+            if self.vel_noise is not None:
+                rand_vel = np.copy(self.sim.init_velocities)
+                rand_vel[2] += np.random.normal(0.0, self.vel_noise, 1)
+                self.sim.v = np.copy(rand_vel)
+            return self.get_state()
+
+
+
 
         # Randomize the start pose
         if self.pos_noise is not None or self.ang_noise is not None:

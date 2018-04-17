@@ -69,8 +69,8 @@ class RingBuffer:
         if np.all([state, action, reward, next_state, done] is not None):
 
             # Build normalizers on first data sample
-            if self.state_norm is None:
-                self.state_norm = Normalizer(shape=state.shape, dtype=state.dtype)
+            # if self.state_norm is None:
+            #     self.state_norm = Normalizer(shape=state.shape, dtype=state.dtype)
 
             # if self.action_norm is None:
             #     self.action_norm = Normalizer(shape=action.shape, dtype=action.dtype)
@@ -79,7 +79,7 @@ class RingBuffer:
             #     self.reward_norm = Normalizer(shape=reward.shape, dtype=reward.dtype)
 
             # Update our normalizer
-            self.state_norm.update(state)
+            # self.state_norm.update(state)
             # self.action_norm.update(action)
             # self.reward_norm.update(reward)
             # self.state_norm.update(next_state)
@@ -106,9 +106,9 @@ class RingBuffer:
         dones = np.array([e.done for e in batch]).astype(np.uint8).reshape(-1, 1)
 
         # Normalize if possible
-        if normalize and self.state_norm is not None:
-            states = self.state_norm.normalize(states)
-            next_states = self.state_norm.normalize(next_states)
+        # if normalize and self.state_norm is not None:
+        #     states = self.state_norm.normalize(states)
+        #     next_states = self.state_norm.normalize(next_states)
 
         # if self.action_norm is not None:
         #     actions = self.action_norm.normalize(actions)
