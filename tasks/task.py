@@ -35,7 +35,7 @@ class Task():
         # self.state_size = self.action_repeat * 6
         self.state_size = len(self.get_state())
         hover = 403.929915
-        self.action_low = 0.8 * hover  # Avoid a div0 error in physic sim
+        self.action_low = 0.95 * hover  # Avoid a div0 error in physic sim
         self.action_high = 1.1 * hover
         self.action_size = 1
 
@@ -44,59 +44,18 @@ class Task():
         self.action_b = (self.action_high+self.action_low)/2.0
 
     def get_reward(self):
-        """Uses current pose of sim to return reward."""
-        # reward = 1.-.3*(abs(self.sim.pose[:3] - self.target_pos)).sum()
-
-        # Position Reward
-        # reward = 1.0/(np.linalg.norm(self.sim.pose[:3] - self.target_pos) + 1.0)
-
-        # Don't hit the ground
-        # reward = min(0.0, np.log(max(0.3679, self.sim.pose[2])))
-
-        # Reward positve velocity
-        # reward += self.sim.v[2]/10.0
-
-        # Penalty for non-goal related velocity
-        # reward -= min(0.5, 0.1*np.log(np.linalg.norm(self.sim.v[:2])+1.0))
-
-        # Penalty for angular velocity
-        # reward -= min(0.5, 0.1*np.log(np.linalg.norm(self.sim.angular_v)+1.0))
-
-        # reward for position
-        # reward = []
-        # reward = 0.333 / (np.log(np.linalg.norm(self.sim.pose[:3] - self.target_pos) + 1) + 1)
-        # reward.append(1.0 * self.reward_func(self.sim.pose[:3] - self.target_pos))
-        # reward.append(self.reward_func(self.sim.v))
-        # reward.append(0.25*self.reward_func(self.sim.angular_v))
-        # reward.append(1.0 * self.reward_func(self.normalize_angles(self.sim.pose[3:])))
-        # return np.prod(reward)
-
         # Positional error
         # penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
+
         # reward = 1/(1+penalty)
-        return np.clip(1-(self.sim.pose[2]-self.target_pos[2])**2, 0, 1)
+        # return np.clip(1-(self.sim.pose[2]-self.target_pos[2])**2, 0, 1)
 
         # return self.reward_from_huber_loss(penalty, delta=1, max_reward=1, min_reward=0)
+        loss = (self.sim.pose[2]-self.target_pos[2])**2
 
-        # reward = 1 - 0.5*penalty
+        reward = self.reward_from_huber_loss(loss, delta=0.5)
 
-        # return np.clip(reward, -1, 1)
-        # penalty += 0.1 * np.linalg.norm(self.normalize_angles(self.sim.pose[3:]))
-
-        # Heading error
-        # penalty += 0.1 * abs(self.normalize_angles(self.sim.pose[-1:]))**2
-
-        # Angular velocity
-        # penalty += 0.1 * np.linalg.norm((self.sim.angular_v))**2
-        # return 1/(penalty + 1)  # turn the penalty into a reward
-
-        # Penalty for velocity
-        # reward += 0.333 / (np.log(np.linalg.norm(self.sim.v) + 1) + 1)
-
-        # Penalty for velocity
-        # reward += 0.333 / (np.log(np.linalg.norm(self.sim.angular_v) + 1) + 1)
-
-        # return reward
+        return reward
 
     def reward_from_huber_loss(self, x, delta, max_reward=1, min_reward=0):
         return np.maximum(max_reward - delta * delta * (np.sqrt(1 + (x / delta) ** 2) - 1), min_reward)
@@ -146,30 +105,8 @@ class Task():
         # Grab reward
         reward = self.get_reward()
 
-        # Give some clear end of episode signals on altitude
-        # if done:
-            # # Lost massive altitude
-            # if next_state[2] < -8.0:
-            #     reward -= 5
-            #
-            # # Gained substantial altitude
-            # if next_state[2] > 8.0:
-            #     reward -= 2
-            #
-            # # Still at target altitude'ish
-            # if abs(next_state[2]) < 8.0:
-            #     reward += 5.0
-
-            # if np.linalg.norm(self.sim.pose[:3] - self.target_pos) < 5:
-            #     reward += 10
-            # else:
-            #     reward -= 10
-
-            # reward += 10/(np.linalg.norm(self.sim.pose[:3] - self.target_pos))
-
-        # tack on the penalty resulting from ending early
-        # if done and self.sim.time < self.sim.runtime:
-        #     reward += reward * (self.sim.runtime - self.sim.time)/self.sim.dt
+        if reward <= 0:
+            done = True
 
         return next_state, reward, done
 
@@ -192,9 +129,6 @@ class Task():
                 rand_vel[2] += np.random.normal(0.0, self.vel_noise, 1)
                 self.sim.v = np.copy(rand_vel)
             return self.get_state()
-
-
-
 
         # Randomize the start pose
         if self.pos_noise is not None or self.ang_noise is not None:

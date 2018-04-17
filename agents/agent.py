@@ -54,7 +54,7 @@ class DDPG():
         self.memory = ReplayBuffer(self.buffer_size, self.batch_size)
 
         # Algorithm parameters
-        self.gamma = 0.99  # discount factor
+        self.gamma = 0.95  # discount factor
         self.tau = 1e-3  # for soft update of target parameters
 
         # Score
@@ -208,9 +208,10 @@ class Actor:
                            use_bias=True
                            # use_bias = False
                            )(states)
-        # net = layers.BatchNormalization()(net)
+        net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
+        # net = layers.Dropout(0.2)(net)
 
         net = layers.Dense(units=400,
                            # activation='relu',
@@ -222,10 +223,11 @@ class Actor:
                            use_bias=True
                            # use_bias=False
                            )(net)
-        # net = layers.BatchNormalization()(net)
+        net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
         # net = layers.ELU()(net)
-        #
+        # net = layers.Dropout(0.2)(net)
+
         net = layers.Dense(units=200,
                            # activation='relu',
                            activation=None,
@@ -235,9 +237,10 @@ class Actor:
                            use_bias=True
                            # use_bias=False
                            )(net)
-        # net = layers.BatchNormalization()(net)
-        net = layers.LeakyReLU(1e-2)(net)
+        net = layers.BatchNormalization()(net)
+        net = layers.LeakyReLU(1e-3)(net)
         # net = layers.ELU()(net)
+        # net = layers.Dropout(0.2)(net)
 
         # net = layers.Dense(units=200,
         #                    # activation='relu',
@@ -285,7 +288,7 @@ class Actor:
         # Incorporate any additional losses here (e.g. from regularizers)
 
         # Define optimizer and training function
-        optimizer = optimizers.Adam(lr=1e-5,
+        optimizer = optimizers.Adam(lr=1e-4,
                                     # clipvalue=0.5,
                                     # clipnorm=1.0
                                     )
@@ -379,9 +382,10 @@ class Critic:
                                   use_bias=True
                                   # use_bias = False
                                   )(states)
-        # net_states = layers.BatchNormalization()(net_states)
+        net_states = layers.BatchNormalization()(net_states)
         net_states = layers.LeakyReLU(1e-2)(net_states)
         # net_states = layers.ELU()(net_states)
+        # net_states = layers.Dropout(0.2)(net_states)
 
         net_states = layers.Dense(units=400,
                                   # activation='relu',
@@ -393,9 +397,10 @@ class Critic:
                                   use_bias=True
                                   # use_bias=False
                                   )(net_states)
-        # net_states = layers.BatchNormalization()(net_states)
+        net_states = layers.BatchNormalization()(net_states)
         net_states = layers.LeakyReLU(1e-2)(net_states)
         # net_states = layers.ELU()(net_states)
+        # net_states = layers.Dropout(0.2)(net_states)
 
         # net_states = layers.Dense(units=128,
         #                           activation='relu',
@@ -419,9 +424,10 @@ class Critic:
                                    use_bias=True
                                    # use_bias=False
                                    )(actions)
-        # net_actions = layers.BatchNormalization()(net_actions)
+        net_actions = layers.BatchNormalization()(net_actions)
         net_actions = layers.LeakyReLU(1e-2)(net_actions)
         # net_actions = layers.ELU()(net_actions)
+        # net_actions = layers.Dropout(0.2)(net_actions)
 
         # net_actions = layers.Dense(units=64,
         #                            activation='relu',
@@ -473,8 +479,9 @@ class Critic:
                            use_bias=True
                            # use_bias=False
                            )(net)
-        # net = layers.BatchNormalization()(net)
-        net = layers.LeakyReLU(1e-2)(net)
+        net = layers.BatchNormalization()(net)
+        net = layers.LeakyReLU(1e-3)(net)
+        # net = layers.Dropout(0.2)(net)
         # net = layers.ELU()(net)
 
         # Add final output layer to prduce action values (Q values)
@@ -489,7 +496,7 @@ class Critic:
         self.model = models.Model(inputs=[states, actions], outputs=Q_values)
 
         # Define optimizer and compile model for training with built-in loss function
-        optimizer = optimizers.Adam(lr=1e-4,
+        optimizer = optimizers.Adam(lr=1e-2,
                                     # clipvalue=0.5,
                                     # clipnorm=1.0
                                     )#, beta_1=0.5)
