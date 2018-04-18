@@ -73,7 +73,13 @@ class PhysicsSim():
         return body_velocity
 
     def get_linear_drag(self):
-        linear_drag = 0.5 * self.rho * self.find_body_velocity()**2 * self.areas * self.C_d
+        body_velocity = self.find_body_velocity()
+
+        # Drag magnitude
+        linear_drag = 0.5 * self.rho * body_velocity**2 * self.areas * self.C_d
+
+        # Direction of drag
+        linear_drag = -np.sign(body_velocity) * linear_drag
         return linear_drag
 
     def get_linear_forces(self, thrusts):
@@ -82,7 +88,7 @@ class PhysicsSim():
         # Thrust
         thrust_body_force = np.array([0, 0, sum(thrusts)])
         # Drag
-        drag_body_force = -self.get_linear_drag()
+        drag_body_force = self.get_linear_drag()
         body_forces = thrust_body_force + drag_body_force
 
         linear_forces = np.matmul(body_to_earth_frame(*list(self.pose[3:])), body_forces)
@@ -128,16 +134,28 @@ class PhysicsSim():
         return moments
 
     def calc_prop_wind_speed(self):
-        body_velocity = self.find_body_velocity()
+        body_velocity = self.find_body_velocity()[2]
         phi_dot, theta_dot = self.angular_v[0], self.angular_v[1]
-        s_0 = np.array([0., 0., theta_dot * self.l_to_rotor])
-        s_1 = -s_0
-        s_2 = np.array([0., 0., phi_dot * self.l_to_rotor])
-        s_3 = -s_2
-        speeds = [s_0, s_1, s_2, s_3]
-        for num in range(4):
-            perpendicular_speed = speeds[num] + body_velocity
-            self.prop_wind_speed[num] = perpendicular_speed[2]
+
+        # Angular velocity about x-axis
+        phi_vel = phi_dot * self.l_to_rotor
+
+        # Angular velocity about y-axis
+        theta_vel = theta_dot * self.l_to_rotor
+
+        self.prop_wind_speed[0] = body_velocity + phi_vel - theta_vel
+        self.prop_wind_speed[1] = body_velocity - phi_vel - theta_vel
+        self.prop_wind_speed[2] = body_velocity - phi_vel + theta_vel
+        self.prop_wind_speed[3] = body_velocity + phi_vel + theta_vel
+
+        # s_0 = np.array([0., 0., theta_dot * self.l_to_rotor])
+        # s_1 = -s_0
+        # s_2 = np.array([0., 0., phi_dot * self.l_to_rotor])
+        # s_3 = -s_2
+        # speeds = [s_0, s_1, s_2, s_3]
+        # for num in range(4):
+        #     perpendicular_speed = speeds[num] + body_velocity
+        #     self.prop_wind_speed[num] = perpendicular_speed[2]
 
     def get_propeller_thrust(self, rotor_speeds):
         '''calculates net thrust (thrust - drag) based on velocity
@@ -148,12 +166,12 @@ class PhysicsSim():
             D = self.propeller_size
             n = rotor_speeds[prop_number]
             if abs(n) > 1:
-                J = V / n * D
+                J = V / (n * D)
             else:
                 J = 0.0
             # From http://m-selig.ae.illinois.edu/pubs/BrandtSelig-2011-AIAA-2011-1255-LRN-Propellers.pdf
             # C_T = max(0.12 - 0.07*max(0.0, J)-.1*max(0.0, J)**2, 0.0)
-            C_T = 0.12 - 0.07 * J - 0.1 * J** 2
+            C_T = 0.12 - 0.07 * J - 0.1 * J**2
             thrusts.append(C_T * self.rho * n**2 * D**4)
         return thrusts
 
@@ -163,13 +181,13 @@ class PhysicsSim():
         thrusts = self.get_propeller_thrust(rotor_speeds)
         self.linear_accel = self.get_linear_forces(thrusts) / self.mass
 
-        position = self.pose[:3] + self.v * self.dt + 0.5 * self.linear_accel * self.dt**2
+        position = self.pose[:3] + self.v * self.dt + 0.5 * self.linear_accel * self.dt*self.dt
         self.v += self.linear_accel * self.dt
 
         moments = self.get_moments(thrusts)
 
         self.angular_accels = moments / self.moments_of_inertia
-        angles = self.pose[3:] + self.angular_v * self.dt + 0.5 * self.angular_accels * self.angular_accels * self.dt
+        angles = self.pose[3:] + self.angular_v * self.dt + 0.5 * self.angular_accels * self.dt*self.dt
         angles = (angles + 2 * np.pi) % (2 * np.pi)
         self.angular_v = self.angular_v + self.angular_accels * self.dt
 

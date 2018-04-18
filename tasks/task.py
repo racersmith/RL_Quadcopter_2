@@ -45,24 +45,19 @@ class Task():
 
     def get_reward(self):
         # Positional error
-        # penalty = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
+        # loss = np.linalg.norm((self.sim.pose[:3] - self.target_pos))
 
         # reward = 1/(1+penalty)
         # return np.clip(1-(self.sim.pose[2]-self.target_pos[2])**2, 0, 1)
 
         # return self.reward_from_huber_loss(penalty, delta=1, max_reward=1, min_reward=0)
         loss = (self.sim.pose[2]-self.target_pos[2])**2
-
+        # loss += 0.1*self.sim.linear_accel[2]**2
         reward = self.reward_from_huber_loss(loss, delta=0.5)
-
         return reward
 
     def reward_from_huber_loss(self, x, delta, max_reward=1, min_reward=0):
         return np.maximum(max_reward - delta * delta * (np.sqrt(1 + (x / delta) ** 2) - 1), min_reward)
-
-    def reward_func(self, x):
-        # return 1.0/(np.linalg.norm(x) + 1.0)
-        return 1.0 / (np.log((np.linalg.norm(x) + 1.0)) + 1.0)
 
     def normalize_angles(self, angles):
         # Normalize angles to +/- 1
@@ -74,13 +69,22 @@ class Task():
 
     def get_state(self):
         pos_error = (self.sim.pose[:3] - self.target_pos)
-        return np.array([pos_error[2], self.sim.v[2]])
+
+        # Simple linear Z-axis state
+        return np.array([pos_error[2],
+                         self.sim.v[2],
+                         self.sim.linear_accel[2]
+                         ])
+
+        # Full State
         # orientation = self.normalize_angles(self.sim.pose[3:])
         # state_list = list()
         # state_list.append(pos_error)
         # state_list.append(orientation)
         # state_list.append(self.sim.v)
+        # state_list.append(self.sim.linear_accel)
         # state_list.append(self.sim.angular_v)
+        # state_list.append(self.sim.angular_accels)
         # state_list.append([self.sim.time])
         # return np.concatenate(state_list)
 
