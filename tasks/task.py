@@ -73,7 +73,7 @@ class Task():
         # Simple linear Z-axis state
         return np.array([pos_error[2],
                          self.sim.v[2],
-                         self.sim.linear_accel[2]
+                         # self.sim.linear_accel[2]
                          ])
 
         # Full State

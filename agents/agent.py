@@ -153,18 +153,19 @@ class Actor:
         # Define input layer (states)
         states = layers.Input(shape=(self.state_size,), name='states')
 
-        # size_repeat = 20
+        # size_repeat = 30
         # block_size = size_repeat*self.state_size
         # print("Actor block size = {}".format(block_size))
         #
-        # # net = layers.concatenate([states]*size_repeat)
-        # net = layers.Dense(block_size,
-        #                    # kernel_initializer=initializers.RandomNormal(mean=1.0, stddev=0.1),
-        #                    #  bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.01),
-        #                    activation=None,
-        #                    use_bias=False)(states)
+        # net = layers.concatenate([states]*size_repeat)
+        # # net = layers.Dense(block_size,
+        # #                    # kernel_initializer=initializers.RandomNormal(mean=1.0, stddev=0.1),
+        # #                    #  bias_initializer=initializers.RandomNormal(mean=0.0, stddev=0.01),
+        # #                    activation=None,
+        # #                    use_bias=False)(states)
         # net = layers.BatchNormalization()(net)
-        # net = layers.LeakyReLU(1e-2)(net)
+        # net = layers.Dropout(0.2)(net)
+        # # net = layers.LeakyReLU(1e-2)(net)
         #
         # for _ in range(5):
         #     net = res_block(net, block_size)
@@ -180,7 +181,7 @@ class Actor:
 
         net = layers.Dense(units=200)(net)
         net = layers.BatchNormalization()(net)
-        net = layers.LeakyReLU(1e-3)(net)
+        net = layers.LeakyReLU(1e-2)(net)
 
 
         # Try different layer sizes, activations, add batch normalization, regularizers, etc.
@@ -198,7 +199,7 @@ class Actor:
 
         actions = layers.Dense(units=self.action_size,
                                activation='tanh',
-                               kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                               # kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                name='actions'
                                )(net)
@@ -258,14 +259,19 @@ class Critic:
         states = layers.Input(shape=(self.state_size,), name='states')
         actions = layers.Input(shape=(self.action_size,), name='actions')
 
-        # size_repeat = 20
+        # size_repeat = 30
         # state_size = size_repeat*self.state_size
         # action_size = size_repeat*self.action_size
         # block_size = size_repeat*self.state_size + size_repeat*self.action_size
         # print("Critic block size = {}".format(block_size))
         #
         # net_states = layers.concatenate(size_repeat * [states])
+        # net_states = layers.BatchNormalization()(net_states)
+        # net_states = layers.Dropout(0.2)(net_states)
+        #
         # net_actions = layers.concatenate(size_repeat * [actions])
+        # net_actions = layers.BatchNormalization()(net_actions)
+        # net_actions = layers.Dropout(0.2)(net_actions)
         #
         # # State pathway
         # for _ in range(3):
@@ -302,7 +308,7 @@ class Critic:
 
         net = layers.Dense(units=200)(net)
         net = layers.BatchNormalization()(net)
-        net = layers.LeakyReLU(1e-3)(net)
+        net = layers.LeakyReLU(1e-2)(net)
 
         # Add final output layer to prduce action values (Q values)
         Q_values = layers.Dense(units=1,
@@ -330,8 +336,10 @@ class Critic:
 
 
 def res_block(inputs, size):
+    kernel_l2_reg = 1e-3
     net = layers.Dense(size,
                        activation=None,
+                       kernel_regularizer=regularizers.l2(kernel_l2_reg),
                        kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3)
                        )(inputs)
     net = layers.BatchNormalization()(net)
@@ -339,6 +347,7 @@ def res_block(inputs, size):
 
     net = layers.Dense(size,
                        activation=None,
+                       kernel_regularizer=regularizers.l2(kernel_l2_reg),
                        kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3)
                        )(net)
     net = layers.BatchNormalization()(net)
