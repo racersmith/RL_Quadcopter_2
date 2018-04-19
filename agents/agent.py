@@ -147,7 +147,7 @@ class Actor:
         self.build_model()
 
     def build_model(self):
-        kernel_l2_reg = 1e-3
+        kernel_l2_reg = 1e-5
 
         """Build an actor (policy) network that maps states -> actions."""
         # Define input layer (states)
@@ -171,15 +171,15 @@ class Actor:
         #     net = res_block(net, block_size)
 
         # Add hidden layers
-        net = layers.Dense(units=300)(states)
+        net = layers.Dense(units=300, kernel_regularizer=regularizers.l2(kernel_l2_reg))(states)
         net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
 
-        net = layers.Dense(units=400)(net)
+        net = layers.Dense(units=400, kernel_regularizer=regularizers.l2(kernel_l2_reg))(net)
         net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
 
-        net = layers.Dense(units=200)(net)
+        net = layers.Dense(units=200, kernel_regularizer=regularizers.l2(kernel_l2_reg))(net)
         net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
 
@@ -199,7 +199,7 @@ class Actor:
 
         actions = layers.Dense(units=self.action_size,
                                activation='tanh',
-                               # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                               kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                kernel_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                name='actions'
                                )(net)
@@ -242,7 +242,7 @@ class Critic:
         self.build_model()
 
     def build_model(self):
-        kernel_l2_reg = 1e-3
+        kernel_l2_reg = 1e-5
 
         # Dense Options
         # units = 200,
@@ -290,30 +290,30 @@ class Critic:
 
 
         # Add hidden layer(s) for state pathway
-        net_states = layers.Dense(units=300)(states)
+        net_states = layers.Dense(units=300, kernel_regularizer=regularizers.l2(kernel_l2_reg))(states)
         net_states = layers.BatchNormalization()(net_states)
         net_states = layers.LeakyReLU(1e-2)(net_states)
 
-        net_states = layers.Dense(units=400)(net_states)
+        net_states = layers.Dense(units=400, kernel_regularizer=regularizers.l2(kernel_l2_reg))(net_states)
         net_states = layers.BatchNormalization()(net_states)
         net_states = layers.LeakyReLU(1e-2)(net_states)
 
         # Add hidden layer(s) for action pathway
-        net_actions = layers.Dense(units=400)(actions)
+        net_actions = layers.Dense(units=400, kernel_regularizer=regularizers.l2(kernel_l2_reg))(actions)
         net_actions = layers.BatchNormalization()(net_actions)
         net_actions = layers.LeakyReLU(1e-2)(net_actions)
 
         # Merge state and action pathways
         net = layers.add([net_states, net_actions])
 
-        net = layers.Dense(units=200)(net)
+        net = layers.Dense(units=200, kernel_regularizer=regularizers.l2(kernel_l2_reg))(net)
         net = layers.BatchNormalization()(net)
         net = layers.LeakyReLU(1e-2)(net)
 
         # Add final output layer to prduce action values (Q values)
         Q_values = layers.Dense(units=1,
                                 activation=None,
-                                # kernel_regularizer=regularizers.l2(kernel_l2_reg),
+                                kernel_regularizer=regularizers.l2(kernel_l2_reg),
                                 kernel_initializer=initializers.RandomUniform(minval=-5e-3, maxval=5e-3),
                                 # bias_initializer=initializers.RandomUniform(minval=-3e-3, maxval=3e-3),
                                 name='q_values')(net)

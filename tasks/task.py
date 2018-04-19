@@ -52,7 +52,7 @@ class Task():
 
         # return self.reward_from_huber_loss(penalty, delta=1, max_reward=1, min_reward=0)
         loss = (self.sim.pose[2]-self.target_pos[2])**2
-        # loss += 0.1*self.sim.linear_accel[2]**2
+        loss += 0.1*self.sim.linear_accel[2]**2
         reward = self.reward_from_huber_loss(loss, delta=0.5)
         return reward
 
@@ -73,7 +73,7 @@ class Task():
         # Simple linear Z-axis state
         return np.array([pos_error[2],
                          self.sim.v[2],
-                         # self.sim.linear_accel[2]
+                         self.sim.linear_accel[2]
                          ])
 
         # Full State
